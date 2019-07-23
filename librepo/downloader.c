@@ -694,17 +694,18 @@ select_suitable_mirror(LrDownload *dd,
     assert(!err || *err == NULL);
 
     *selected_mirror = NULL;
-    // mirrors_iterated is used to allow to use mirrors multiple times for a targed
+    // mirrors_iterated is used to allow to use mirrors multiple times for a target
     int mirrors_iterated = 0;
-    //  Iterate over mirrors for a target. When all mirrors cannot be used for a download at the
-    //  time during the first iteration, allow additional iterataions to get number af allowed
-    //  failures equal to dd->allowed_mirror_failures
+    //  Iterate over mirrors for the target. If no suitable mirror is found on
+    //  the first iteration, relax the conditions (by allowing previously
+    //  failing mirrors to be used again) and do additional iterations up to
+    //  number af allowed failures equal to dd->allowed_mirror_failures.
     do {
-        // Iterate over mirror for the target
         for (GSList *elem = target->lrmirrors; elem; elem = g_slist_next(elem)) {
             LrMirror *c_mirror = elem->data;
-            gchar *mirrorurl = c_mirror->mirror->url; // shortcut
+            gchar *mirrorurl = c_mirror->mirror->url;
 
+            // first iteration, filter out mirrors that failed previously
             if (mirrors_iterated == 0) {
                 if (g_slist_find(target->tried_mirrors, c_mirror)) {
                     // This mirror was already tried for this target
@@ -719,6 +720,8 @@ select_suitable_mirror(LrDownload *dd,
                             __func__, c_mirror->failed_transfers, mirrorurl);
                     continue;
                 }
+            // on subsequent iterations, only skip mirrors that failed
+            // proportionally to the number of iterations
             } else if (mirrors_iterated < c_mirror->failed_transfers) {
                 continue;
             }
